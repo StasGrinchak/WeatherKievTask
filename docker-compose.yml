@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:12.9-alpine
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=server
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+  web:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000 &&
+             python manage.py createsuperuser --username=admin --email=admin@gmail.com --noinput"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_DB=server
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env.dev
+  redis:
+    image: redis:5-alpine
+
+  celery:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    command: celery -A IBMPythonServer worker -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    env_file:
+      - ./.env.dev
+  celery_beat:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    command: celery -A IBMPythonServer beat -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    env_file:
+      - ./.env.dev
